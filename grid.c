@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "grid.h"
 #include <iostream>
   
@@ -15,20 +14,20 @@ Grid:: Grid(int levels)
     _length_f += (temp - 1)*(temp - 1);
   }
   
-	_levels = levels;
-	_sigma = 0;
+  _levels = levels;
+  _sigma = 0;
   _u = new double[_length_u];
   _f = new double[_length_f];
 
-	for(int i = 0; i < _length_u; ++i)
-	{
-		_u[i] =  0;
-	}
+  for(int i = 0; i < _length_u; ++i)
+  {
+    _u[i] =  0;
+  }
 
-	for(int i = 0; i < _length_f; ++i)
-	{
-		_f[i] =  0;
-	}
+  for(int i = 0; i < _length_f; ++i)
+  {
+    _f[i] =  0;
+  }
 }
 
 Grid:: Grid(int levels, double sigma)
@@ -158,17 +157,14 @@ double Grid:: get_f(int level, int x, int y)
 
 void Grid:: initialise_u_boundary(double(* u_initialiser)(double, double))
 {
-	int dimension = (1 << _levels);
-	for( int xy = 0; xy <= dimension; ++xy )
-	{
-
-			set_u(_levels, xy, 0, u_initialiser(xy/double(dimension), 0));
-			set_u(_levels, xy, dimension, u_initialiser(xy/double(dimension), 1));
-			set_u(_levels, 0, xy, u_initialiser(0, xy/double(dimension)));
-			set_u(_levels, dimension, xy, u_initialiser(1, xy/double(dimension)));
-
-	}
-
+  int dimension = (1 << _levels);
+  for( int xy = 0; xy <= dimension; ++xy )
+  {
+    set_u(_levels, xy, 0, u_initialiser(xy/double(dimension), 0));
+    set_u(_levels, xy, dimension, u_initialiser(xy/double(dimension), 1));
+    set_u(_levels, 0, xy, u_initialiser(0, xy/double(dimension)));
+    set_u(_levels, dimension, xy, u_initialiser(1, xy/double(dimension)));
+  }
 }
 
 void Grid:: initialise_u(double(* u_initialiser)(double, double))
@@ -241,28 +237,54 @@ void Grid:: print_f(int level)
 
 void Grid:: rb_gauss_seidel_relaxation(int level)
 {
-	int dimension = (1 << level);
-	double h2 = 1.0/double(dimension);
-	int start;
-	double value;
-	double mult = 1.0/(4.0 + h2*_sigma);
-	for( int y = 1; y < dimension; ++y )
-	{
-		start = y%2 + 1;
-		for( int x = start; x < dimension; x += 2)
-		{
-			value = mult*(get_u(level, x+1, y) + get_u(level, x-1, y) + get_u(level, x, y+1) + get_u(level, x+1, y-1) + h2*get_f(level, x-1, y-1));
-			set_u(level, x, y, 0);
-		}
-	}
+  int dimension = (1 << level);
+  double h2 = 1.0/double(dimension);
+  int start;
+  double value;
+  double mult = 1.0/(4.0 + h2*_sigma);
+  for( int y = 1; y < dimension; ++y )
+  {
+    start = y%2 + 1;
+    for( int x = start; x < dimension; x += 2)
+    {
+      value = mult*(get_u(level, x+1, y) + get_u(level, x-1, y) + get_u(level, x, y+1) + get_u(level, x, y-1) + h2*get_f(level, x-1, y-1));
+      set_u(level, x, y, value);
+    }
+  }
 
-	for( int y = 1; y < dimension; ++y )
-	{
-		start = (y+1)%2 + 1;
-		for( int x = start; x < dimension; x += 2)
-		{
-			value = mult*(get_u(level, x+1, y) + get_u(level, x-1, y) + get_u(level, x, y+1) + get_u(level, x+1, y-1) + h2*get_f(level, x-1, y-1));
-			set_u(level, x, y, value);
-		}
-	}
+  for( int y = 1; y < dimension; ++y )
+  {
+    start = (y+1)%2 + 1;
+    for( int x = start; x < dimension; x += 2)
+    {
+      value = mult*(get_u(level, x+1, y) + get_u(level, x-1, y) + get_u(level, x, y+1) + get_u(level, x, y-1) + h2*get_f(level, x-1, y-1));
+      set_u(level, x, y, value);
+    }
+  }
 }
+
+
+void Grid:: fw_restrict(int level)
+{
+  double *residual = new double [((1<< level) + 1)*((1<< level) + 1)];
+  
+  
+  delete residual;
+}
+
+
+void Grid:: calc_residual(double *residual)
+{
+  //set boundaries to zero
+  
+}
+
+
+
+
+
+
+
+
+
+

@@ -18,17 +18,19 @@ private:
 
 public:
   Grid(int levels);
-	Grid(int levels, double sigma);
+  Grid(int levels, double sigma);
   ~Grid();
   
-	void rb_gauss_seidel_relaxation(int level);
+  void rb_gauss_seidel_relaxation(int level);
   void initialise_u_boundary(double(* u_initialiser)(double, double));
-	void initialise_u(double(* u_initialiser)(double, double));
-	void initialise_f(double(* u_initialiser)(double, double));
-	void print(int level);
-	void print_f(int level);
-	void print_all(void);
-	void print_all_f(void);
+  void initialise_u(double(* u_initialiser)(double, double));
+  void initialise_f(double(* u_initialiser)(double, double));
+  void print(int level);
+  void print_f(int level);
+  void print_all(void);
+  void print_all_f(void);
+  void fw_restrict(int level);
+  void calc_residual(double *residual);
   
   
 };
