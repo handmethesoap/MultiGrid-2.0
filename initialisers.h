@@ -3,5 +3,7 @@
 
 
 double sin_function(double x, double y);
+double constant(double x, double y);
+double constant2(double x, double y);
 
 #endif

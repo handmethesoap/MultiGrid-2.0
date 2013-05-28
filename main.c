@@ -4,6 +4,8 @@
 
 int main(int argc, char* argv[])
 {
+
+std::cout << argv << std::endl;
   int L = atoi(argv[1]);
   
   std::cout << L << std::endl;
