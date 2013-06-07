@@ -11,17 +11,15 @@ private:
 	int _length_u;
 	int _length_f;
 
-  void set_u(int level, int x, int y, double value);
-	double get_u(int level, int x, int y);
-	void set_f(int level, int x, int y, double value);
-	double get_f(int level, int x, int y);
+	int get_index(int level, int x, int y);
+	int get_f_index(int level, int x, int y);
 
 public:
   Grid(int levels);
   Grid(int levels, double sigma);
   ~Grid();
   
-  void rb_gauss_seidel_relaxation(int level);
+  double rb_gauss_seidel_relaxation(int level);
   void initialise_u_boundary(double(* u_initialiser)(double, double));
   void initialise_u(double(* u_initialiser)(double, double));
   void initialise_f(double(* u_initialiser)(double, double));
@@ -30,7 +28,7 @@ public:
   void print_all(void);
   void print_all_f(void);
   void fw_restrict(int level);
-  void calc_residual(double *residual);
+  double * calc_residual(int level);
   
   
 };
