@@ -29,6 +29,7 @@ public:
   void print_all_f(void);
   void fw_restrict(int level);
   double * calc_residual(int level);
+  void interpolate(int level);
   
   
 };
