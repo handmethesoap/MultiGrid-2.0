@@ -1,55 +1,35 @@
+// ConsoleApplication2.cpp : Defines the entry point for the console application.
+//
+
 #include <stdlib.h>
 #include <iostream>
+#include <fstream>
 #include "grid.h"
 #include "initialisers.h"
 
 int main(int argc, char* argv[])
 {
-
   int L = atoi(argv[1]);
-  double residual = 0.0;
   int it = 0;
-  std::cout << L << std::endl;
-  
-  Grid A(L);
-  A.initialise_u_boundary(constant);
-  //A.initialise_u_boundary(constant2);
-//   for(int i = 0; i <= 5; ++i)
-//   {
-//     std::cout << "----------------------ITERATION NUMBER " << i << std::endl;
-//     A.print(3);
-//     A.rb_gauss_seidel_relaxation(3);
-//     A.print(3);
-//     A.fw_restrict(3);
-//     A.print_f(2);
-//     A.rb_gauss_seidel_relaxation(2);
-//     A.print(2);
-//     A.interpolate(2);
-//     A.print(3);
-//     
-//   }
-  do
-  {
-    residual = A.rb_gauss_seidel_relaxation(3);
-    std::cout << "residual = " << residual << std::endl;
-    A.print(3);
-    ++it;
-    A.fw_restrict(3);
-    residual = A.rb_gauss_seidel_relaxation(2);
-    A.fw_restrict(2);
-    residual = A.rb_gauss_seidel_relaxation(1);
-    A.interpolate(1);
-    ++it;
-    residual = A.rb_gauss_seidel_relaxation(2);
-    A.interpolate(2);
-    A.print(3);
-    ++it;
-    
-  }while(residual > 1e-7);
-  std::cout << "number of iterations = "<< it << std::endl;
-  A.print(3);
+  const double pi = 3.14159;
 
-  
+	////initialise grid
+  Grid A(L);
+	A.initialise_u_boundary(sin_function);
+	A.initialise_f(sin_function_2);
+	A.initialise_sigma(omega);
+
+
+	//solve multigrid problem and output number of iterations
+	it = A.multigrid_solve(1e-10, 1, 1);
+  std::cout << "number of iterations = "<< it << std::endl;
+
+	//output result to file in format compatiable with gnuplot
+	std::ofstream outputfile;
+	outputfile.open("solution.dat");
+	outputfile << A;
+	outputfile.close();
+
+
   return 0;
-  
 }

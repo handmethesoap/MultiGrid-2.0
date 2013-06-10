@@ -1,5 +1,6 @@
 #include "grid.h"
 #include <iostream>
+#include <fstream>
 #include <cmath> 
   
 Grid:: Grid(int levels)
@@ -16,7 +17,7 @@ Grid:: Grid(int levels)
   }
   
   _levels = levels;
-  _sigma = 0.0;
+  _sigma = new double[_length_u];
   _u = new double[_length_u];
   _f = new double[_length_f];
 
@@ -29,35 +30,6 @@ Grid:: Grid(int levels)
   {
     _f[i] =  0.0;
   }
-}
-
-Grid:: Grid(int levels, double sigma)
-{
-  _length_u = 0;
-  _length_f = 0; 
-  int temp = 0;
-  
-  for(int i = 1; i <= levels; ++i)
-  {
-    temp = (1 << i);
-    _length_u += (temp + 1)*(temp + 1);
-    _length_f += (temp - 1)*(temp - 1);
-  }
-  
-	_levels = levels;
-	_sigma = sigma;
-  _u = new double[_length_u];
-  _f = new double[_length_f];
-
-	for(int i = 0; i < _length_u; ++i)
-	{
-		_u[i] =  0.0;
-	}
-
-	for(int i = 0; i < _length_f; ++i)
-	{
-		_f[i] =  0.0;
-	}
 }
 
 Grid:: ~Grid()
@@ -148,6 +120,25 @@ void Grid:: initialise_f(double(* u_initialiser)(double, double))
 
 }
 
+void Grid:: initialise_sigma(double(* sigma_initialiser)(double, double))
+{
+	int dimension = 0;
+
+	//loop through each level initialising the sigma values
+	for(int l = 1; l <= _levels; ++l)
+	{
+		dimension = (1 << l);
+		for( int y = 0; y <= dimension; ++y )
+		{
+			for( int x = 0; x <= dimension; ++x)
+			{
+				_sigma[get_index(l, x, y)] =  sigma_initialiser(x/double(dimension), y/double(dimension));
+			}
+		}
+	}
+
+}
+
 void Grid:: print_all(void)
 {
 	for(int i = 0; i < _length_u; ++i)
@@ -194,42 +185,55 @@ void Grid:: print_f(int level)
 	std::cout << std::endl;
 }
 
+void Grid:: print_sigma(int level)
+{
+  std::cout << std::endl;
+	for(int y = 0; y <= (1 << level); ++y)
+	{
+		for( int x = 0; x <= (1 << level); ++x)
+		{
+			std::cout << _sigma[get_index(level, x, y)] << " ";
+		}
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+}
+
 double Grid:: rb_gauss_seidel_relaxation(int level)
 {
   int dimension = (1 << level);
   double h2 = 1.0/(double(dimension)*double(dimension));
   int start;
   double value;
-  double mult = 1.0/(4.0 + h2*_sigma);
   double residual = 0.0;
   
+	//loop through the even grid points
   for( int y = 1; y < dimension; ++y )
   {
     start = y%2 + 1;
     for( int x = start; x < dimension; x += 2)
     {
-      value = mult*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
+      value = 1.0/(4.0 + h2*_sigma[get_index(level,x,y)])*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
       residual += std::abs(value - _u[get_index(level, x, y)]);
       _u[get_index(level, x, y)] =  value;
 			
     }
   }
 
+	//loop through the odd grid points
   for( int y = 1; y < dimension; ++y )
   {
     start = (y+1)%2 + 1;
     for( int x = start; x < dimension; x += 2)
     {
-      value = mult*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
+      value = 1.0/(4.0 + h2*_sigma[get_index(level,x,y)])*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
       residual += std::abs(value - _u[get_index(level, x, y)]);
-      //std::cout << std::abs(value - _u[get_index(level, x, y)]) << std::endl;
       _u[get_index(level, x, y)] = value;
     }
   }
   
 	return residual*h2;
 }
-
 
 void Grid:: fw_restrict(int level)
 {
@@ -245,12 +249,17 @@ void Grid:: fw_restrict(int level)
       _f[get_f_index(level-1, x, y)] = 0.0625*( residual[(2*y-1)*(upper_size+1) + 2*x-1] + residual[(2*y-1)*(upper_size+1) + 2*x+1] + residual[(2*y+1)*(upper_size+1) + 2*x-1] + residual[(2*y+1)*(upper_size+1) + 2*x+1] + 2.0*( residual[(2*y-1)*(upper_size+1) + 2*x] + residual[(2*y+1)*(upper_size+1) + 2*x] + residual[2*y*(upper_size+1) + 2*x-1] + residual[2*y*(upper_size+1) + 2*x+1]) + 4.0*residual[2*y*(upper_size+1) + 2*x]);
     }
   }
-//   int x=1;
-//   int y=1;
-//   std::cout << "0.625*("<<residual[(2*y-1)*(upper_size+1) + 2*x-1]<< "+" << residual[(2*y-1)*(upper_size+1) + 2*x+1] << "+" << residual[(2*y+1)*(upper_size+1) + 2*x-1] << "+" << residual[(2*y+1)*(upper_size+1) + 2*x+1] << "+" << "2.0*(" << residual[(2*y-1)*(upper_size+1) + 2*x] << "+" << residual[(2*y+1)*(upper_size+1) + 2*x] <<"+"<<  residual[2*y*(upper_size+1) + 2*x-1] <<"+"<< residual[2*y*(upper_size+1) + 2*x+1]<<") +" << "4.0*" << residual[2*y*(upper_size+1) + 2*x] << ") = "<< 0.0625*( residual[(2*y-1)*(upper_size+1) + 2*x-1] + residual[(2*y-1)*(upper_size+1) + 2*x+1] + residual[(2*y+1)*(upper_size+1) + 2*x-1] + residual[(2*y+1)*(upper_size+1) + 2*x+1] + 2.0*( residual[(2*y-1)*(upper_size+1) + 2*x] + residual[(2*y+1)*(upper_size+1) + 2*x] + residual[2*y*(upper_size+1) + 2*x-1] + residual[2*y*(upper_size+1) + 2*x+1]) + 4.0*residual[2*y*(upper_size+1) + 2*x]) << std::endl;
+
+	//write zeroes to the _u matrix for the level we just restircted to
+	for(int y = 0; y <= size; ++y)
+  {
+    for(int x = 0; x <= size; ++x)
+    {
+      _u[get_index(level-1, x, y)] = 0.0;
+    }
+  }
   delete residual;
 }
-
 
 double * Grid:: calc_residual(int level)
 {
@@ -272,22 +281,9 @@ double * Grid:: calc_residual(int level)
   {
     for(int x = 1; x < size; ++x)
     {
-      residual[x + y*(size+1)] = h2*(_u[get_index(level, x + 1, y)] + _u[get_index(level, x - 1, y)] + _u[get_index(level, x, y + 1)] + _u[get_index(level, x, y - 1)] - 4.0*_u[get_index(level, x, y)]) + _f[get_f_index(level, x, y)];
+      residual[x + y*(size+1)] = h2*(_u[get_index(level, x + 1, y)] + _u[get_index(level, x - 1, y)] + _u[get_index(level, x, y + 1)] + _u[get_index(level, x, y - 1)] - 4.0*_u[get_index(level, x, y)]) + _f[get_f_index(level, x, y)] - _sigma[get_index(level, x, y)]*_u[get_index(level, x, y)];
     }
   }
-//   int x=2;
-//   int y=1;
-//   std::cout << h2 << "*(" << _u[get_index(level, x + 1, y)] << "+" << _u[get_index(level, x - 1, y)] << "+" << _u[get_index(level, x, y + 1)] << "+" << _u[get_index(level, x, y - 1)] <<"- 4*" << 4.0*_u[get_index(level, x, y)] << ") +" << _f[get_f_index(level, x, y)] << "=" << h2*(_u[get_index(level, x + 1, y)] + _u[get_index(level, x - 1, y)] + _u[get_index(level, x, y + 1)] + _u[get_index(level, x, y - 1)] - 4.0*_u[get_index(level, x, y)]) + 0.0<< std::endl;
-  
-  //test print residual
-//   for(int y = 0; y <= size; ++y)
-//   {
-//     for(int x = 0; x <= size; ++x)
-//     {
-//       std::cout << residual[x + y*(size+1)] << " ";
-//     }
-//     std::cout << std::endl;
-//   }
   
   return residual;
   
@@ -298,15 +294,6 @@ void Grid:: interpolate(int level)
   int size = (1 << (level));
   int upper_size = (1 << (level + 1));
   double *interpol = new double [(upper_size + 1)*(upper_size + 1)];
-  
-  //temporarily set all values to 3
-  for(int y = 0; y <= upper_size; ++y)
-  {
-    for(int x = 0; x <= upper_size; ++x)
-    {
-      interpol[y*(upper_size+1) + x] = 3;
-    }
-  }
   
   //set boundaries to zero
   for(int i = 0; i <= upper_size; ++i)
@@ -352,19 +339,9 @@ void Grid:: interpolate(int level)
       interpol[(2*y-1)*(upper_size+1) + 2*x-1] = (interpol[(2*y-2)*(upper_size+1) + 2*x-2] + interpol[(2*y-2)*(upper_size+1) + 2*x]+ interpol[(2*y)*(upper_size+1) + 2*x-2]+ interpol[(2*y)*(upper_size+1) + 2*x])*0.25;
     }
   }
-  
-//   //print interpolated grid
-//   for(int y = 0; y <= upper_size; ++y)
-//   {
-//     for(int x = 0; x <= upper_size; ++x)
-//     {
-//       std::cout << interpol[y*(upper_size + 1) + x] << " ";
-//     }
-//     std::cout << std::endl;
-//   }
  
   //add to gird
-    for(int y = 0; y <= upper_size; ++y)
+  for(int y = 0; y <= upper_size; ++y)
   {
     for(int x = 0; x <= upper_size; ++x)
     {
@@ -375,10 +352,143 @@ void Grid:: interpolate(int level)
   delete interpol;
 }
 
+int Grid:: rb_solve(double precision)
+{
+	double residual = 0.0;
+	int iterations = 0;
+	
+	//solve via rb gauss seidel alone
+	do
+	{
+		residual = rb_gauss_seidel_relaxation(_levels);
+		++iterations;
+	}
+	while((residual > precision) && (iterations < 10000));
+
+	if(iterations == 10000)
+	{
+		return 0;
+	}
+	else
+	{
+		return iterations;
+	}
+
+}
+
+int Grid:: two_level_solve(double precision, int v1, int v2)
+{
+	double residual = 0.0;
+	int iterations = 0;
+
+	//perform initial relaxation on highest level
+	for( int i = 0; i < v1; ++i)
+	{
+		residual = rb_gauss_seidel_relaxation(_levels);
+	}
+	fw_restrict(_levels);
+
+	//perform 2 level calculations
+	do
+	{
+		for( int i = 0; i < v2; ++i)
+		{
+			residual = rb_gauss_seidel_relaxation(_levels-1);
+		}
+		interpolate(_levels - 1);
+
+		for( int i = 0; i < v1; ++i)
+		{
+			residual = rb_gauss_seidel_relaxation(_levels);
+		}
+		fw_restrict(_levels);
+		++iterations;
+	}
+	while((residual > precision) && (iterations < 1000));
+
+	if(iterations == 1000)
+	{
+		return 0;
+	}
+	else
+	{
+		return iterations;
+	}
+
+}
+
+int Grid:: multigrid_solve(double precision, int v1, int v2)
+{
+	double residual = 0.0;
+	int iterations = 0;
 
 
+	do
+	{
+		//descend through the levels
+		for( int i = _levels; i > 1; --i)
+		{
+			for( int j = 0; j < v1; ++j)
+			{
+				residual = rb_gauss_seidel_relaxation(i);
+			}
+			fw_restrict(i);
+		}
 
+		//direct solution of lowest level
+		residual = rb_gauss_seidel_relaxation(1);
 
+		//ascend through the levels
+		for( int i = 1; i < _levels; ++i)
+		{
+			interpolate(i);
+			for( int j = 0; j < v2; ++j)
+			{
+				residual = rb_gauss_seidel_relaxation(i+1);
+			}
+		}
+		++iterations;
+	}
+	while((residual > precision) && (iterations < 1000));
 
+	if(iterations == 1000)
+	{
+		return 0;
+	}
+	else
+	{
+		return iterations;
+	}
 
+}
 
+std::ostream& operator<< (std::ostream &out, Grid &outputGrid)
+{
+  double n = ( 1<< outputGrid._levels);
+  
+	//output u matrix in format compatiable with gnuplot
+  for( int y = 0; y < n; ++y)
+  {
+    for( int x = 0; x < n; ++x )
+    {
+      out << double(x)/(n-1.0) << " " <<  double(y)/(n-1.0) << " " << outputGrid._u[outputGrid.get_index(outputGrid._levels, x, y)] << std::endl;
+    }
+    out << std::endl;
+  }
+
+  return out;
+}
+
+double Grid:: L2_norm(double(* exact_solution)(double, double))
+{
+	int dimension = (1 << _levels);
+	double norm = 0.0;
+	for( int y = 1; y < dimension; ++y )
+	{
+		for( int x = 1; x < dimension; ++x)
+		{
+			norm += (_u[get_index(_levels, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)))*(_u[get_index(_levels, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)));
+		}
+	}
+	return sqrt(norm)/((dimension+1)*(dimension+1));
+}
