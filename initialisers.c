@@ -34,28 +34,28 @@ double constant(double x, double y)
 
 double constant2(double x, double y)
 {
-	return x + y;
+  return x + y;
 }
 
 double ramp(double x, double y)
 {
-	return x;
+  return x;
 }
 
 double omega(double x, double y)
 {
-	double delta = 0.01;
-	if((abs(0.5 - x) < delta) && (abs(0.5 - y) < delta))
-	{
-		return 10e6;
-	}
-	else
-	{
-		return 1;
-	}
+  double delta = 0.01;
+  if((std::abs(0.5 - x) < delta) && (std::abs(0.5 - y) < delta))
+  {
+    return 10e6;
+  }
+  else
+  {
+    return 1;
+  }
 }
 
 double pi_function(double x, double y)
 {
-	return pi*pi;
+  return pi*pi;
 }

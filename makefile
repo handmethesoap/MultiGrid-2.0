@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -O3 -Wall -Wshadow -Winline -ansi -pedantic -g $(INCLUDES)
+CFLAGS = -O3 -Wall -Wshadow -Winline -ansi -pedantic $(INCLUDES)
 LIBS = 
 INCLUDES =
 TARGET = multigrid
