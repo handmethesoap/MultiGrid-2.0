@@ -9,9 +9,12 @@ private:
   double* _u;
   double* _f;
   double* _sigma;
+  double* _grid_pointers;
   int _levels;
-  int _length_u;
-  int _length_f;
+  int* _offsets_u;
+  int* _offsets_f;
+  int* _grid_dimensions_u;
+  int* _grid_dimensions_f;
 
   int get_index(int level, int x, int y);
   int get_f_index(int level, int x, int y);
@@ -31,8 +34,6 @@ public:
 
   void print(int level);
   void print_f(int level);
-  void print_all(void);
-  void print_all_f(void);
   void print_sigma(int level);
 
   void fw_restrict(int level);

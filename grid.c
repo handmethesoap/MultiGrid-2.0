@@ -5,28 +5,33 @@
   
 Grid:: Grid(int levels)
 {
-  _length_u = 0;
-  _length_f = 0; 
+  _offsets_u = new int[levels];
+  _offsets_f = new int[levels]; 
   int temp = 0;
-  
+  int u_length_sum = 0;
+  int f_length_sum = 0;
+
   for(int i = 1; i <= levels; ++i)
   {
+    _offsets_u[i-1] = u_length_sum;
+    _offsets_f[i-1] = f_length_sum;
     temp = (1 << i);
-    _length_u += (temp + 1)*(temp + 1);
-    _length_f += (temp - 1)*(temp - 1);
+    u_length_sum += (temp + 1)*(temp + 1);
+    f_length_sum += (temp - 1)*(temp - 1);
   }
   
   _levels = levels;
-  _sigma = new double[_length_u];
-  _u = new double[_length_u];
-  _f = new double[_length_f];
+  _sigma = new double[u_length_sum];
+  _u = new double[u_length_sum];
+  _f = new double[f_length_sum];
+  
 
-  for(int i = 0; i < _length_u; ++i)
+  for(int i = 0; i < u_length_sum; ++i)
   {
     _u[i] =  0.0;
   }
 
-  for(int i = 0; i < _length_f; ++i)
+  for(int i = 0; i < f_length_sum; ++i)
   {
     _f[i] =  0.0;
   }
@@ -43,11 +48,9 @@ int Grid:: get_index(int level, int x, int y)
   int dimension = (1 << level) + 1;
   int level_offset = 0;
 
-  for(int i = 1; i < level; ++i)
-  {
-    level_offset += ((1 << i) + 1)*((1 << i) + 1);
-  }
-
+  level_offset = _offsets_u[level - 1];
+  
+#ifdef DEBUG
   if( x >= dimension )
   {
     std::cout << "max x dimension of " << dimension << " reached or execeed by attempt to access " << x << std::endl;
@@ -56,6 +59,7 @@ int Grid:: get_index(int level, int x, int y)
   {
     std::cout << "max y dimension of " << dimension << " reached or execeed by attempt to access " << y << std::endl;
   }
+#endif
 
   return level_offset + (y)*dimension + x;
 }
@@ -65,11 +69,9 @@ int Grid:: get_f_index(int level, int x, int y)
   int dimension = (1 << level) - 1;
   int level_offset = 0;
 
-  for(int i = 1; i < level; ++i)
-  {
-    level_offset += ((1 << i) - 1)*((1 << i) - 1);
-  }
-
+  level_offset = _offsets_f[level - 1];
+  
+#ifdef DEBUG
   if( x-1 >= dimension )
   {
 	  std::cout << "max x dimension of " << dimension << " reached or execeed by attempt to access " << x << std::endl;
@@ -78,6 +80,7 @@ int Grid:: get_f_index(int level, int x, int y)
   {
 	  std::cout << "max y dimension of " << dimension << " reached or execeed by attempt to access " << y << std::endl;
   }
+#endif
 
   return level_offset + (y - 1)*dimension + (x - 1);
 }
@@ -137,24 +140,6 @@ void Grid:: initialise_sigma(double(* sigma_initialiser)(double, double))
     }
   }
 
-}
-
-void Grid:: print_all(void)
-{
-  for(int i = 0; i < _length_u; ++i)
-  {
-    std::cout << "_u[" << i+1 << "] = " << _u[i] << std::endl;
-  }
-  std::cout << "end" << std::endl;
-}
-
-void Grid:: print_all_f(void)
-{
-  for(int i = 0; i < _length_f; ++i)
-  {
-    std::cout << "_f[" << i+1 << "] = " << _f[i] << std::endl;
-  }
-  std::cout << "end" << std::endl;
 }
 
 void Grid:: print(int level)
