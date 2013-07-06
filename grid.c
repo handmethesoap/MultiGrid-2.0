@@ -336,6 +336,59 @@ void Grid:: interpolate(int level)
   delete interpol;
 }
 
+void Grid:: interpolate(int level, double(* boundary_initialiser)(double, double))
+{
+  int size = (1 << (level));
+  int upper_size = (1 << (level + 1));
+  
+  //set boundaries
+  for( int xy = 0; xy <= upper_size; ++xy )
+  {
+    _u[get_index(level+1, xy, 0)] =  boundary_initialiser(xy/double(upper_size), 0.0);
+    _u[get_index(level+1, xy, upper_size)] = boundary_initialiser(xy/double(upper_size), 1.0);
+    _u[get_index(level+1, 0, xy)] = boundary_initialiser(0.0, xy/double(upper_size));
+    _u[get_index(level+1, upper_size, xy)] = boundary_initialiser(1.0, xy/double(upper_size));
+  }
+  
+  //copy directly values
+  for(int y = 1; y < size; ++y)
+  {
+    for(int x = 1; x < size; ++x)
+    {
+      _u[get_index(level+1,2*x, 2*y)]= _u[get_index(level,x,y)];
+    }
+  }
+  
+  //horizontally interpolate values
+  for(int y = 1; y < size; ++y)
+  {
+    for(int x = 1; x < size + 1; ++x)
+    {
+      _u[get_index(level+1,2*x-1, 2*y)] = (_u[get_index(level+1,2*x-2, 2*y)] + _u[get_index(level+1,2*x, 2*y)])*0.5;
+    }
+  }
+  
+  //vertically interpolate values
+  for(int y = 1; y < size + 1; ++y)
+  {
+    for(int x = 1; x < size; ++x)
+    {
+      _u[get_index(level+1,2*x, 2*y-1)] = (_u[get_index(level+1,2*x, 2*y-2)] + _u[get_index(level+1,2*x, 2*y)])*0.5;
+    }
+  }
+ 
+  //diagonally interpolate values
+  for(int y = 1; y < size + 1; ++y)
+  {
+    for(int x = 1; x < size + 1; ++x)
+    {
+      _u[get_index(level+1,2*x-1, 2*y-1)] = (_u[get_index(level+1,2*x-2, 2*y-2)] + _u[get_index(level+1,2*x, 2*y-2)]+ _u[get_index(level+1,2*x-2, 2*y)]+ _u[get_index(level+1,2*x, 2*y)])*0.25;
+    }
+  }
+ 
+}
+
+
 int Grid:: rb_solve(double precision)
 {
   double residual = 0.0;
@@ -446,6 +499,51 @@ int Grid:: multigrid_solve(double precision, int v1, int v2)
 
 }
 
+int Grid:: level_solve(int level, double precision, int v1, int v2)
+{
+  double residual = 0.0;
+  int iterations = 0;
+
+
+  do
+  {
+    //descend through the levels
+    for( int i = level; i > 1; --i)
+    {
+      for( int j = 0; j < v1; ++j)
+      {
+	residual = rb_gauss_seidel_relaxation(i);
+      }
+      fw_restrict(i);
+    }
+
+    //direct solution of lowest level
+    residual = rb_gauss_seidel_relaxation(1);
+
+    //ascend through the levels
+    for( int i = 1; i < level; ++i)
+    {
+      interpolate(i);
+      for( int j = 0; j < v2; ++j)
+      {
+	residual = rb_gauss_seidel_relaxation(i+1);
+      }
+    }
+    ++iterations;
+  }
+  while((residual > precision) && (iterations < 1000));
+
+  if(iterations == 1000)
+  {
+    return 0;
+  }
+  else
+  {
+    return iterations;
+  }
+
+}
+
 std::ostream& operator<< (std::ostream &out, Grid &outputGrid)
 {
   double n = ( 1<< outputGrid._levels);
@@ -476,3 +574,43 @@ double Grid:: L2_norm(double(* exact_solution)(double, double))
   }
   return sqrt(norm)/((dimension+1)*(dimension+1));
 }
+
+void Grid::fmg_solve(double(* boundary_initialiser)(double, double))
+{
+  int cycles;
+  
+  //set boundaries of lowest level
+  int dimension = (1 << 1);
+  for( int xy = 0; xy <= dimension; ++xy )
+  {
+    _u[get_index(1, xy, 0)] =  boundary_initialiser(xy/double(dimension), 0.0);
+    _u[get_index(1, xy, dimension)] = boundary_initialiser(xy/double(dimension), 1.0);
+    _u[get_index(1, 0, xy)] = boundary_initialiser(0.0, xy/double(dimension));
+    _u[get_index(1, dimension, xy)] = boundary_initialiser(1.0, xy/double(dimension));
+  }
+  
+  //solve lowest level
+  rb_gauss_seidel_relaxation(1);
+  
+  for(int i = 1; i < _levels; ++i)
+  {
+    interpolate(i, boundary_initialiser);
+    cycles = level_solve(i+1, 1e-10, 1, 1);
+    std::cout << "number of cycles at level " << i+1 << " = " << cycles << std::endl;
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

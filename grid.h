@@ -39,10 +39,13 @@ public:
   void fw_restrict(int level);
   double * calc_residual(int level);
   void interpolate(int level);
+  void interpolate(int level, double(* boundary_initialiser)(double, double));
 
   int rb_solve(double precision);
   int two_level_solve(double precision, int v1, int v2);
   int multigrid_solve(double precision, int v1, int v2);
+  void fmg_solve(double(* boundary_initialiser)(double, double));
+  int level_solve(int level, double precision, int v1, int v2);
 
   double L2_norm(double(* exact_solution)(double, double));
 
