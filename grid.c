@@ -21,7 +21,6 @@ Grid:: Grid(int levels)
   }
   
   _levels = levels;
-  _sigma = new double[u_length_sum];
   _u = new double[u_length_sum];
   _f = new double[f_length_sum];
   
@@ -123,25 +122,6 @@ void Grid:: initialise_f(double(* u_initialiser)(double, double))
 
 }
 
-void Grid:: initialise_sigma(double(* sigma_initialiser)(double, double))
-{
-  int dimension = 0;
-
-  //loop through each level initialising the sigma values
-  for(int l = 1; l <= _levels; ++l)
-  {
-    dimension = (1 << l);
-    for( int y = 0; y <= dimension; ++y )
-    {
-      for( int x = 0; x <= dimension; ++x)
-      {
-	_sigma[get_index(l, x, y)] =  sigma_initialiser(x/double(dimension), y/double(dimension));
-      }
-    }
-  }
-
-}
-
 void Grid:: print(int level)
 {
   std::cout << std::endl;
@@ -170,27 +150,13 @@ void Grid:: print_f(int level)
   std::cout << std::endl;
 }
 
-void Grid:: print_sigma(int level)
-{
-  std::cout << std::endl;
-  for(int y = 0; y <= (1 << level); ++y)
-  {
-    for( int x = 0; x <= (1 << level); ++x)
-    {
-      std::cout << _sigma[get_index(level, x, y)] << " ";
-    }
-    std::cout << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-double Grid:: rb_gauss_seidel_relaxation(int level)
+void Grid:: rb_gauss_seidel_relaxation(int level)
 {
   int dimension = (1 << level);
   double h2 = 1.0/(double(dimension)*double(dimension));
   int start;
   double value;
-  double residual = 0.0;
+  //double residual = 0.0;
   
   //loop through the even grid points
   for( int y = 1; y < dimension; ++y )
@@ -198,8 +164,8 @@ double Grid:: rb_gauss_seidel_relaxation(int level)
     start = y%2 + 1;
     for( int x = start; x < dimension; x += 2)
     {
-      value = 1.0/(4.0 + h2*_sigma[get_index(level,x,y)])*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
-      residual += std::abs(value - _u[get_index(level, x, y)]);
+      value = 1.0/(4.0)*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
+      //residual += std::abs(value - _u[get_index(level, x, y)]);
       _u[get_index(level, x, y)] =  value;
     }
   }
@@ -210,13 +176,12 @@ double Grid:: rb_gauss_seidel_relaxation(int level)
     start = (y+1)%2 + 1;
     for( int x = start; x < dimension; x += 2)
     {
-      value = 1.0/(4.0 + h2*_sigma[get_index(level,x,y)])*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
-      residual += std::abs(value - _u[get_index(level, x, y)]);
+      value = 1.0/(4.0)*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
+      //residual += std::abs(value - _u[get_index(level, x, y)]);
       _u[get_index(level, x, y)] = value;
     }
   }
-  
-  return residual*h2;
+
 }
 
 void Grid:: fw_restrict(int level)
@@ -265,7 +230,7 @@ double * Grid:: calc_residual(int level)
   {
     for(int x = 1; x < size; ++x)
     {
-      residual[x + y*(size+1)] = h2*(_u[get_index(level, x + 1, y)] + _u[get_index(level, x - 1, y)] + _u[get_index(level, x, y + 1)] + _u[get_index(level, x, y - 1)] - 4.0*_u[get_index(level, x, y)]) + _f[get_f_index(level, x, y)] - _sigma[get_index(level, x, y)]*_u[get_index(level, x, y)];
+      residual[x + y*(size+1)] = h2*(_u[get_index(level, x + 1, y)] + _u[get_index(level, x - 1, y)] + _u[get_index(level, x, y + 1)] + _u[get_index(level, x, y - 1)] - 4.0*_u[get_index(level, x, y)]) + _f[get_f_index(level, x, y)];
     }
   }
   
@@ -388,137 +353,27 @@ void Grid:: interpolate(int level, double(* boundary_initialiser)(double, double
  
 }
 
-
-int Grid:: rb_solve(double precision)
+int Grid:: level_solve(int level, int v_cycles, int v1, int v2)
 {
-  double residual = 0.0;
   int iterations = 0;
-  
-  //solve via rb gauss seidel alone
-  do
-  {
-    residual = rb_gauss_seidel_relaxation(_levels);
-    ++iterations;
-  }
-  while((residual > precision) && (iterations < 10000));
-
-  if(iterations == 10000)
-  {
-    return 0;
-  }
-  else
-  {
-    return iterations;
-  }
-
-}
-
-int Grid:: two_level_solve(double precision, int v1, int v2)
-{
-  double residual = 0.0;
-  int iterations = 0;
-
-  //perform initial relaxation on highest level
-  for( int i = 0; i < v1; ++i)
-  {
-    residual = rb_gauss_seidel_relaxation(_levels);
-  }
-  fw_restrict(_levels);
-
-  //perform 2 level calculations
-  do
-  {
-    for( int i = 0; i < v2; ++i)
-    {
-      residual = rb_gauss_seidel_relaxation(_levels-1);
-    }
-    interpolate(_levels - 1);
-
-    for( int i = 0; i < v1; ++i)
-    {
-      residual = rb_gauss_seidel_relaxation(_levels);
-    }
-    fw_restrict(_levels);
-    ++iterations;
-  }
-  while((residual > precision) && (iterations < 1000));
-
-  if(iterations == 1000)
-  {
-    return 0;
-  }
-  else
-  {
-    return iterations;
-  }
-
-}
-
-int Grid:: multigrid_solve(double precision, int v1, int v2)
-{
-  double residual = 0.0;
-  int iterations = 0;
+  double l2norm;
+  double previousl2norm = 0.0;
 
 
-  do
-  {
-    //descend through the levels
-    for( int i = _levels; i > 1; --i)
-    {
-      for( int j = 0; j < v1; ++j)
-      {
-	residual = rb_gauss_seidel_relaxation(i);
-      }
-      fw_restrict(i);
-    }
-
-    //direct solution of lowest level
-    residual = rb_gauss_seidel_relaxation(1);
-
-    //ascend through the levels
-    for( int i = 1; i < _levels; ++i)
-    {
-      interpolate(i);
-      for( int j = 0; j < v2; ++j)
-      {
-	residual = rb_gauss_seidel_relaxation(i+1);
-      }
-    }
-    ++iterations;
-  }
-  while((residual > precision) && (iterations < 1000));
-
-  if(iterations == 1000)
-  {
-    return 0;
-  }
-  else
-  {
-    return iterations;
-  }
-
-}
-
-int Grid:: level_solve(int level, double precision, int v1, int v2)
-{
-  double residual = 0.0;
-  int iterations = 0;
-
-
-  do
+  for(int k = 0; k < v_cycles; ++k)
   {
     //descend through the levels
     for( int i = level; i > 1; --i)
     {
       for( int j = 0; j < v1; ++j)
       {
-	residual = rb_gauss_seidel_relaxation(i);
+	rb_gauss_seidel_relaxation(i);
       }
       fw_restrict(i);
     }
 
     //direct solution of lowest level
-    residual = rb_gauss_seidel_relaxation(1);
+    rb_gauss_seidel_relaxation(1);
 
     //ascend through the levels
     for( int i = 1; i < level; ++i)
@@ -526,12 +381,20 @@ int Grid:: level_solve(int level, double precision, int v1, int v2)
       interpolate(i);
       for( int j = 0; j < v2; ++j)
       {
-	residual = rb_gauss_seidel_relaxation(i+1);
+	rb_gauss_seidel_relaxation(i+1);
       }
     }
     ++iterations;
+    #ifdef TEST
+    l2norm = L2_norm(level);
+    std::cout << "L2 norm of residual at level " << level << " = " << l2norm << std::endl;
+    if(previousl2norm != 0.0)
+    {
+      std::cout << "convergence rate = " << (previousl2norm - l2norm)/previousl2norm << std::endl;
+    }
+    previousl2norm = l2norm;
+    #endif
   }
-  while((residual > precision) && (iterations < 1000));
 
   if(iterations == 1000)
   {
@@ -561,24 +424,24 @@ std::ostream& operator<< (std::ostream &out, Grid &outputGrid)
   return out;
 }
 
-double Grid:: L2_norm(double(* exact_solution)(double, double))
+double Grid:: exact_L2_norm(int level, double(* exact_solution)(double, double))
 {
-  int dimension = (1 << _levels);
+  int dimension = (1 << level);
   double norm = 0.0;
   for( int y = 1; y < dimension; ++y )
   {
     for( int x = 1; x < dimension; ++x)
     {
-      norm += (_u[get_index(_levels, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)))*(_u[get_index(_levels, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)));
+      norm += (_u[get_index(level, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)))*(_u[get_index(level, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)));
     }
   }
   return sqrt(norm)/((dimension+1)*(dimension+1));
 }
 
-void Grid::fmg_solve(double(* boundary_initialiser)(double, double))
+void Grid::fmg_solve(int v_cycles, double(* boundary_initialiser)(double, double))
 {
   int cycles;
-  
+  double error;
   //set boundaries of lowest level
   int dimension = (1 << 1);
   for( int xy = 0; xy <= dimension; ++xy )
@@ -591,17 +454,38 @@ void Grid::fmg_solve(double(* boundary_initialiser)(double, double))
   
   //solve lowest level
   rb_gauss_seidel_relaxation(1);
-  
+
   for(int i = 1; i < _levels; ++i)
   {
     interpolate(i, boundary_initialiser);
-    cycles = level_solve(i+1, 1e-10, 1, 1);
+    cycles = level_solve(i+1, v_cycles, 1, 1);
+    
+#ifdef TEST
+    error = exact_L2_norm(i+1, boundary_initialiser);
     std::cout << "number of cycles at level " << i+1 << " = " << cycles << std::endl;
+    std::cout << "L2 norm of error at level " << i+1 << " = " << error << std::endl << std::endl;
+#endif
   }
 
 }
 
-
+double Grid::L2_norm(int level)
+{
+  double *residual = calc_residual(level);
+  int size = (1 << level);
+  double L2norm = 0.0;
+  
+  for(int y = 1; y < size; ++y)
+  {
+    for(int x = 1; x < size; ++x)
+    {
+      L2norm += residual[x + y*(size+1)] * residual[x + y*(size+1)];
+    }
+  }
+  
+  return sqrt(L2norm);
+  
+}
 
 
 
