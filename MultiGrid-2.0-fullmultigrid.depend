@@ -1,0 +1,51 @@
+# depslib dependency file v1.0
+1373294351 source:c:\users\khoanguyen\documents\github\multigrid-2.0-fullmultigrid\grid.c
+	"grid.h"
+	<iostream>
+	<fstream>
+	<cmath>
+	<omp.h>
+
+1373289475 c:\users\khoanguyen\documents\github\multigrid-2.0-fullmultigrid\grid.h
+	<iostream>
+
+1373127108 source:c:\users\khoanguyen\documents\github\multigrid-2.0-fullmultigrid\initialisers.c
+	<cmath>
+	"initialisers.h"
+
+1373127108 c:\users\khoanguyen\documents\github\multigrid-2.0-fullmultigrid\initialisers.h
+
+1373294201 source:c:\users\khoanguyen\documents\github\multigrid-2.0-fullmultigrid\main.c
+	<stdlib.h>
+	<sys/time.h>
+	<ctime>
+	<iostream>
+	<fstream>
+	"grid.h"
+	"initialisers.h"
+
+1373296965 source:c:\users\khoanguyen\documents\github\multigrid-2.0\grid.c
+	"grid.h"
+	<iostream>
+	<fstream>
+	<cmath>
+	<omp.h>
+
+1373289475 c:\users\khoanguyen\documents\github\multigrid-2.0\grid.h
+	<iostream>
+
+1373127108 source:c:\users\khoanguyen\documents\github\multigrid-2.0\initialisers.c
+	<cmath>
+	"initialisers.h"
+
+1373127108 c:\users\khoanguyen\documents\github\multigrid-2.0\initialisers.h
+
+1373294201 source:c:\users\khoanguyen\documents\github\multigrid-2.0\main.c
+	<stdlib.h>
+	<sys/time.h>
+	<ctime>
+	<iostream>
+	<fstream>
+	"grid.h"
+	"initialisers.h"
+

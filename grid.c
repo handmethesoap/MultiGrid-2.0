@@ -1,12 +1,14 @@
 #include "grid.h"
 #include <iostream>
 #include <fstream>
-#include <cmath> 
-  
+#include <cmath>
+#include <omp.h>
+
+using namespace std;
 Grid:: Grid(int levels)
 {
   _offsets_u = new int[levels];
-  _offsets_f = new int[levels]; 
+  _offsets_f = new int[levels];
   int temp = 0;
   int u_length_sum = 0;
   int f_length_sum = 0;
@@ -19,12 +21,11 @@ Grid:: Grid(int levels)
     u_length_sum += (temp + 1)*(temp + 1);
     f_length_sum += (temp - 1)*(temp - 1);
   }
-  
+
   _levels = levels;
-  _sigma = new double[u_length_sum];
   _u = new double[u_length_sum];
   _f = new double[f_length_sum];
-  
+
 
   for(int i = 0; i < u_length_sum; ++i)
   {
@@ -49,7 +50,7 @@ int Grid:: get_index(int level, int x, int y)
   int level_offset = 0;
 
   level_offset = _offsets_u[level - 1];
-  
+
 #ifdef DEBUG
   if( x >= dimension )
   {
@@ -70,7 +71,7 @@ int Grid:: get_f_index(int level, int x, int y)
   int level_offset = 0;
 
   level_offset = _offsets_f[level - 1];
-  
+
 #ifdef DEBUG
   if( x-1 >= dimension )
   {
@@ -123,25 +124,6 @@ void Grid:: initialise_f(double(* u_initialiser)(double, double))
 
 }
 
-void Grid:: initialise_sigma(double(* sigma_initialiser)(double, double))
-{
-  int dimension = 0;
-
-  //loop through each level initialising the sigma values
-  for(int l = 1; l <= _levels; ++l)
-  {
-    dimension = (1 << l);
-    for( int y = 0; y <= dimension; ++y )
-    {
-      for( int x = 0; x <= dimension; ++x)
-      {
-	_sigma[get_index(l, x, y)] =  sigma_initialiser(x/double(dimension), y/double(dimension));
-      }
-    }
-  }
-
-}
-
 void Grid:: print(int level)
 {
   std::cout << std::endl;
@@ -170,53 +152,41 @@ void Grid:: print_f(int level)
   std::cout << std::endl;
 }
 
-void Grid:: print_sigma(int level)
+void Grid:: rb_gauss_seidel_relaxation(int level,int times)
 {
-  std::cout << std::endl;
-  for(int y = 0; y <= (1 << level); ++y)
-  {
-    for( int x = 0; x <= (1 << level); ++x)
-    {
-      std::cout << _sigma[get_index(level, x, y)] << " ";
-    }
-    std::cout << std::endl;
-  }
-  std::cout << std::endl;
-}
+    int dimension = (1 << level);
+    double h2 = 1.0/(double(dimension)*double(dimension));
+    int start;
+    double value;
+    //double residual = 0.0;
+    for (int iter = 0; iter<times; ++iter){
 
-double Grid:: rb_gauss_seidel_relaxation(int level)
-{
-  int dimension = (1 << level);
-  double h2 = 1.0/(double(dimension)*double(dimension));
-  int start;
-  double value;
-  double residual = 0.0;
-  
-  //loop through the even grid points
-  for( int y = 1; y < dimension; ++y )
-  {
-    start = y%2 + 1;
-    for( int x = start; x < dimension; x += 2)
-    {
-      value = 1.0/(4.0 + h2*_sigma[get_index(level,x,y)])*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
-      residual += std::abs(value - _u[get_index(level, x, y)]);
-      _u[get_index(level, x, y)] =  value;
-    }
-  }
+        //loop through the even grid points
+        #pragma omp parallel for private(start,value)
+        for( int y = 1; y < dimension; ++y )
+        {
+            start = y%2 + 1;
+            for( int x = start; x < dimension; x += 2)
+            {
+                value = (1-omega)*_u[get_index(level, x, y)] +omega/(4.0)*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
+                //residual += std::abs(value - _u[get_index(level, x, y)]);
+                _u[get_index(level, x, y)] =  value;
+            }
+        }
 
-	//loop through the odd grid points
-  for( int y = 1; y < dimension; ++y )
-  {
-    start = (y+1)%2 + 1;
-    for( int x = start; x < dimension; x += 2)
-    {
-      value = 1.0/(4.0 + h2*_sigma[get_index(level,x,y)])*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
-      residual += std::abs(value - _u[get_index(level, x, y)]);
-      _u[get_index(level, x, y)] = value;
+        //loop through the odd grid points
+        #pragma omp parallel for private(start,value)
+        for( int y = 1; y < dimension; ++y )
+        {
+            start = (y+1)%2 + 1;
+            for( int x = start; x < dimension; x += 2)
+            {
+                value = (1-omega)*_u[get_index(level, x, y)] +omega/(4.0)*(_u[get_index(level, x+1, y)] + _u[get_index(level, x-1, y)] + _u[get_index(level, x, y+1)] + _u[get_index(level, x, y-1)] + h2*_f[get_f_index(level, x, y)]);
+                //residual += std::abs(value - _u[get_index(level, x, y)]);
+                _u[get_index(level, x, y)] = value;
+            }
+        }
     }
-  }
-  
-  return residual*h2;
 }
 
 void Grid:: fw_restrict(int level)
@@ -224,8 +194,8 @@ void Grid:: fw_restrict(int level)
   int size = (1<< (level-1));
   int upper_size = (1<<level);
   double *residual = calc_residual(level);
-  
   //caluclate restricted values
+  #pragma omp parallel for
   for(int y = 1; y < size; ++y)
   {
     for(int x = 1; x < size; ++x)
@@ -250,7 +220,7 @@ double * Grid:: calc_residual(int level)
   int size = (1 << level);
   double *residual = new double [(size + 1)*(size + 1)];
   double h2 = double(size)*double(size);
-  
+
   //set boundary to zero
   for(int i = 0; i <= size; ++i)
   {
@@ -259,197 +229,232 @@ double * Grid:: calc_residual(int level)
     residual[(size+1)*i] = 0.0;
     residual[(size+1)*i + size] = 0.0;
   }
-  
+
+  #pragma omp parallel for
   //caluclate interior points
   for(int y = 1; y < size; ++y)
   {
     for(int x = 1; x < size; ++x)
     {
-      residual[x + y*(size+1)] = h2*(_u[get_index(level, x + 1, y)] + _u[get_index(level, x - 1, y)] + _u[get_index(level, x, y + 1)] + _u[get_index(level, x, y - 1)] - 4.0*_u[get_index(level, x, y)]) + _f[get_f_index(level, x, y)] - _sigma[get_index(level, x, y)]*_u[get_index(level, x, y)];
+      residual[x + y*(size+1)] = h2*(_u[get_index(level, x + 1, y)] + _u[get_index(level, x - 1, y)] + _u[get_index(level, x, y + 1)] + _u[get_index(level, x, y - 1)] - 4.0*_u[get_index(level, x, y)]) + _f[get_f_index(level, x, y)];
     }
   }
-  
+
   return residual;
-  
+
 }
 
-void Grid:: interpolate(int level)
+void Grid::interpolate(int level){
+  int size = (1 << (level));
+  //upper row
+  #pragma omp parallel for
+  for(int y = 1; y < size; ++y){
+    for(int x = 1; x < size; ++x){
+      int xx = 2*x, yy = 2*y;
+      _u[get_index(level+1, xx-1,yy+1)] += 0.25 * _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx  ,yy+1)] += 0.5  * _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx+1,yy+1)] += 0.25 * _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx-1,yy)]   += 0.5  * _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx,  yy)]   +=        _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx+1,yy)]   += 0.5  * _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx-1,yy-1)] += 0.25 * _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx  ,yy-1)] += 0.5  * _u[get_index(level,x,y)];
+      _u[get_index(level+1, xx+1,yy-1)] += 0.25 * _u[get_index(level,x,y)];
+    }
+  }
+
+}
+
+void Grid:: interpolate(int level, double(* boundary_initialiser)(double, double))
 {
   int size = (1 << (level));
   int upper_size = (1 << (level + 1));
-  double *interpol = new double [(upper_size + 1)*(upper_size + 1)];
-  
-  //set boundaries to zero
-  for(int i = 0; i <= upper_size; ++i)
-  {
-    interpol[i] = 0.0;
-    interpol[(upper_size)*(upper_size+1) + i] = 0.0;
-    interpol[(upper_size+1)*i] = 0.0;
-    interpol[(upper_size+1)*i + upper_size] = 0.0;
-  }
-  
-  //copy directly values
-  for(int y = 1; y < size; ++y)
-  {
-    for(int x = 1; x < size; ++x)
-    {
-      interpol[2*y*(upper_size+1) + 2*x] = _u[get_index(level,x,y)];
-    }
-  }
-  
-  //horizontally interpolate values
-  for(int y = 1; y < size; ++y)
-  {
-    for(int x = 1; x < size + 1; ++x)
-    {
-      interpol[2*y*(upper_size+1) + 2*x - 1] = (interpol[2*y*(upper_size+1) + 2*x - 2] + interpol[2*y*(upper_size+1) + 2*x])*0.5;
-    }
-  }
-  
-  //vertically interpolate values
-  for(int y = 1; y < size + 1; ++y)
-  {
-    for(int x = 1; x < size; ++x)
-    {
-      interpol[(2*y-1)*(upper_size+1) + 2*x] = (interpol[(2*y-2)*(upper_size+1) + 2*x] + interpol[2*y*(upper_size+1) + 2*x])*0.5;
-    }
-  }
- 
-  //diagonally interpolate values
-  for(int y = 1; y < size + 1; ++y)
-  {
-    for(int x = 1; x < size + 1; ++x)
-    {
-      interpol[(2*y-1)*(upper_size+1) + 2*x-1] = (interpol[(2*y-2)*(upper_size+1) + 2*x-2] + interpol[(2*y-2)*(upper_size+1) + 2*x]+ interpol[(2*y)*(upper_size+1) + 2*x-2]+ interpol[(2*y)*(upper_size+1) + 2*x])*0.25;
-    }
-  }
- 
-  //add to gird
-  for(int y = 0; y <= upper_size; ++y)
-  {
-    for(int x = 0; x <= upper_size; ++x)
-    {
-      _u[get_index(level+1, x,y)] += interpol[y*(upper_size+1) + x];
-    }
-  }
-  
-  delete interpol;
+
+//set boundaries
+for( int xy = 0; xy <= upper_size; ++xy ){
+    _u[get_index(level+1, xy, 0)] =  boundary_initialiser(xy/double(upper_size), 0.0);
+    _u[get_index(level+1, xy, upper_size)] = boundary_initialiser(xy/double(upper_size), 1.0);
+    _u[get_index(level+1, 0, xy)] = boundary_initialiser(0.0, xy/double(upper_size));
+    _u[get_index(level+1, upper_size, xy)] = boundary_initialiser(1.0, xy/double(upper_size));
 }
 
-int Grid:: rb_solve(double precision)
-{
-  double residual = 0.0;
-  int iterations = 0;
-  
-  //solve via rb gauss seidel alone
-  do
-  {
-    residual = rb_gauss_seidel_relaxation(_levels);
-    ++iterations;
-  }
-  while((residual > precision) && (iterations < 10000));
+   // #pragma omp parallel
+    {
+/*
+        #pragma omp for
+        for(int y = 1; y < size; ++y){
+            for(int x = 1; x < size; ++x){
+                _u[get_index(level+1,2*x, 2*y)]= _u[get_index(level,x,y)];
+                //horizontal
+                _u[get_index(level+1,2*x-1, 2*y)] = (_u[get_index(level,x-1, y)] + _u[get_index(level,x, y)])*0.5;
+                //vertical
+                _u[get_index(level+1,2*y, 2*x-1)] = (_u[get_index(level,y, x-1)] + _u[get_index(level,y, x)])*0.5;
+                //diagonal
+                _u[get_index(level+1,2*x-1, 2*y-1)] = (_u[get_index(level,x-1, y-1)] + _u[get_index(level,x, y-1)]+ _u[get_index(level,x-1, y)]+ _u[get_index(level,x, y)])*0.25;
+            }
+            //horizontal
+            _u[get_index(level+1,2*size-1, 2*y)] = (_u[get_index(level,size-1, y)] + _u[get_index(level,size, y)])*0.5;
+            //vertical
+             _u[get_index(level+1,2*y, 2*size-1)] = (_u[get_index(level,y, size-1)] + _u[get_index(level,y, size)])*0.5;
+            //diagonal
+            _u[get_index(level+1,2*size-1, 2*y-1)] = (_u[get_index(level,size-1, y-1)] + _u[get_index(level,size, y-1)]+ _u[get_index(level,size-1, y)]+ _u[get_index(level,size, y)])*0.25;
+        }
 
-  if(iterations == 10000)
-  {
-    return 0;
-  }
-  else
-  {
-    return iterations;
-  }
+        #pragma omp for
+        for(int x = 1; x < size; ++x){
 
+             //diagonal
+             _u[get_index(level+1,2*x-1, 2*size-1)] = (_u[get_index(level,x-1, size-1)] + _u[get_index(level,x, size-1)]+ _u[get_index(level,x-1, size)]+ _u[get_index(level,x, size)])*0.25;
+        }
+*/
+
+        //copy directly values
+   //     #pragma omp for nowait
+        for(int y = 1; y < size; ++y){
+            for(int x = 1; x < size; ++x){
+                _u[get_index(level+1,2*x, 2*y)]= _u[get_index(level,x,y)];
+            }
+        }
+
+        //horizontally interpolate values
+   //     #pragma omp for nowait
+        for(int y = 1; y < size; ++y){
+            for(int x = 1; x < size + 1; ++x){
+                //_u[get_index(level+1,2*x-1, 2*y)] = (_u[get_index(level+1,2*x-2, 2*y)] + _u[get_index(level+1,2*x, 2*y)])*0.5;
+                _u[get_index(level+1,2*x-1, 2*y)] = (_u[get_index(level,x-1, y)] + _u[get_index(level,x, y)])*0.5;
+            }
+        }
+
+        //vertically interpolate values
+   //     #pragma omp for nowait
+        for(int y = 1; y < size + 1; ++y){
+            for(int x = 1; x < size; ++x){
+                //_u[get_index(level+1,2*x, 2*y-1)] = (_u[get_index(level+1,2*x, 2*y-2)] + _u[get_index(level+1,2*x, 2*y)])*0.5;
+                _u[get_index(level+1,2*x, 2*y-1)] = (_u[get_index(level,x, y-1)] + _u[get_index(level,x, y)])*0.5;
+            }
+        }
+
+        //diagonally interpolate values
+   //     #pragma omp for nowait
+        for(int y = 1; y < size + 1; ++y){
+            for(int x = 1; x < size + 1; ++x){
+                // _u[get_index(level+1,2*x-1, 2*y-1)] = (_u[get_index(level+1,2*x-2, 2*y-2)] + _u[get_index(level+1,2*x, 2*y-2)]+ _u[get_index(level+1,2*x-2, 2*y)]+ _u[get_index(level+1,2*x, 2*y)])*0.25;
+                _u[get_index(level+1,2*x-1, 2*y-1)] = (_u[get_index(level,x-1, y-1)] + _u[get_index(level,x, y-1)]+ _u[get_index(level,x-1, y)]+ _u[get_index(level,x, y)])*0.25;
+            }
+        }
+
+    }
 }
-
-int Grid:: two_level_solve(double precision, int v1, int v2)
+int Grid:: Wcycle(int level, int w_cycles, int v1, int v2)
 {
-  double residual = 0.0;
-  int iterations = 0;
-
-  //perform initial relaxation on highest level
-  for( int i = 0; i < v1; ++i)
-  {
-    residual = rb_gauss_seidel_relaxation(_levels);
-  }
-  fw_restrict(_levels);
-
-  //perform 2 level calculations
-  do
-  {
-    for( int i = 0; i < v2; ++i)
-    {
-      residual = rb_gauss_seidel_relaxation(_levels-1);
+    double l2norm;
+    double previousl2norm = 0.0;
+    int iteration = 0;
+    for(int k = 0; k < w_cycles; ++k){
+        rb_gauss_seidel_relaxation(level,v1);
+        for (int lv = level; lv>2; --lv){
+            fw_restrict(lv);
+        }
+        Vcycle(2,2,v1,v2);
+        for (int lv = 2; lv<level; ++lv){
+            interpolate(lv);
+        }
+        rb_gauss_seidel_relaxation(level,v2);
+        #ifdef TEST
+        l2norm = L2_norm(level);
+        std::cout << "L2 norm of residual at level " << level << " = " << l2norm << std::endl;
+        if(previousl2norm != 0.0)   {
+            std::cout << "convergence rate = " << (previousl2norm - l2norm)/previousl2norm << std::endl;
+        }
+        previousl2norm = l2norm;
+        #endif
+        ++iteration;
     }
-    interpolate(_levels - 1);
-
-    for( int i = 0; i < v1; ++i)
-    {
-      residual = rb_gauss_seidel_relaxation(_levels);
-    }
-    fw_restrict(_levels);
-    ++iterations;
-  }
-  while((residual > precision) && (iterations < 1000));
-
-  if(iterations == 1000)
-  {
-    return 0;
-  }
-  else
-  {
-    return iterations;
-  }
-
+    return iteration;
 }
-
-int Grid:: multigrid_solve(double precision, int v1, int v2)
+/*
+int Grid::Vcycle(int level, int v_cycles, int v1, int v2)
 {
-  double residual = 0.0;
-  int iterations = 0;
-
-
-  do
-  {
-    //descend through the levels
-    for( int i = _levels; i > 1; --i)
+    double l2norm;
+    double previousl2norm = 0.0;
+    int iteration = 0;
+    for(int k = 0; k < v_cycles; ++k)
     {
-      for( int j = 0; j < v1; ++j)
-      {
-	residual = rb_gauss_seidel_relaxation(i);
-      }
-      fw_restrict(i);
+        rb_gauss_seidel_relaxation(level,v1);
+        //descend through the levels
+        for( int i = level; i > 1; --i)
+        {
+          fw_restrict(i);
+        }
+
+        //direct solution of lowest level
+        rb_gauss_seidel_relaxation(1,1);
+
+        //ascend through the levels
+        for( int i = 1; i < level; ++i)
+        {
+            interpolate(i);
+
+        }
+        rb_gauss_seidel_relaxation(level,v2);
+        #ifdef TEST
+        l2norm = L2_norm(level);
+        std::cout << "L2 norm of residual at level " << level << " = " << l2norm << std::endl;
+        if(previousl2norm != 0.0)
+        {
+            std::cout << "convergence rate = " << (previousl2norm - l2norm)/previousl2norm << std::endl;
+        }
+        previousl2norm = l2norm;
+        #endif
+        ++iteration;
     }
+    return iteration;
+}
+*/
 
-    //direct solution of lowest level
-    residual = rb_gauss_seidel_relaxation(1);
-
-    //ascend through the levels
-    for( int i = 1; i < _levels; ++i)
+int Grid::Vcycle(int level, int v_cycles, int v1, int v2)
+{
+    double l2norm;
+    double previousl2norm = 0.0;
+    int iteration = 0;
+    for(int k = 0; k < v_cycles; ++k)
     {
-      interpolate(i);
-      for( int j = 0; j < v2; ++j)
-      {
-	residual = rb_gauss_seidel_relaxation(i+1);
-      }
+        //descend through the levels
+        for( int i = level; i > 1; --i)
+        {
+          rb_gauss_seidel_relaxation(i,v1);
+          fw_restrict(i);
+        }
+
+        //direct solution of lowest level
+        rb_gauss_seidel_relaxation(1,1);
+
+        //ascend through the levels
+        for( int i = 1; i < level; ++i)
+        {
+            interpolate(i);
+            rb_gauss_seidel_relaxation(i+1,v2);
+        }
+
+        #ifdef TEST
+        l2norm = L2_norm(level);
+        std::cout << "L2 norm of residual at level " << level << " = " << l2norm << std::endl;
+        if(previousl2norm != 0.0)
+        {
+            std::cout << "convergence rate = " << (previousl2norm - l2norm)/previousl2norm << std::endl;
+        }
+        previousl2norm = l2norm;
+        #endif
+
+        ++iteration;
     }
-    ++iterations;
-  }
-  while((residual > precision) && (iterations < 1000));
-
-  if(iterations == 1000)
-  {
-    return 0;
-  }
-  else
-  {
-    return iterations;
-  }
-
+    return iteration;
 }
 
 std::ostream& operator<< (std::ostream &out, Grid &outputGrid)
 {
   double n = ( 1<< outputGrid._levels);
-  
+
   //output u matrix in format compatiable with gnuplot
   for( int y = 0; y < n; ++y)
   {
@@ -463,16 +468,83 @@ std::ostream& operator<< (std::ostream &out, Grid &outputGrid)
   return out;
 }
 
-double Grid:: L2_norm(double(* exact_solution)(double, double))
+double Grid:: exact_L2_norm(int level, double(* exact_solution)(double, double))
 {
-  int dimension = (1 << _levels);
+  int dimension = (1 << level);
   double norm = 0.0;
+  #pragma omp parallel for reduction(+:norm)
   for( int y = 1; y < dimension; ++y )
   {
     for( int x = 1; x < dimension; ++x)
     {
-      norm += (_u[get_index(_levels, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)))*(_u[get_index(_levels, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)));
+      norm += (_u[get_index(level, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)))*(_u[get_index(level, x, y)] -  exact_solution(x/double(dimension), y/double(dimension)));
     }
   }
   return sqrt(norm)/((dimension+1)*(dimension+1));
 }
+
+void Grid::fmg_solve(int v_cycles, int _v1, int _v2, double _omega, double(* boundary_initialiser)(double, double))
+{
+  int cycles;
+  double error;
+  //set boundaries of lowest level
+  int dimension = (1 << 1);
+  v1 = _v1;
+  v2 = _v2;
+  omega = _omega;
+  for( int xy = 0; xy <= dimension; ++xy )
+  {
+    _u[get_index(1, xy, 0)] =  boundary_initialiser(xy/double(dimension), 0.0);
+    _u[get_index(1, xy, dimension)] = boundary_initialiser(xy/double(dimension), 1.0);
+    _u[get_index(1, 0, xy)] = boundary_initialiser(0.0, xy/double(dimension));
+    _u[get_index(1, dimension, xy)] = boundary_initialiser(1.0, xy/double(dimension));
+  }
+
+  //solve lowest level
+  rb_gauss_seidel_relaxation(1,1);
+
+  for(int i = 1; i < _levels; ++i)
+  {
+    interpolate(i, boundary_initialiser);
+    //cycles = Vcycle(i+1, v_cycles, v1, v2);
+    cycles = Vcycle(i+1, v_cycles, v1, v2);
+
+//#ifdef TEST
+    error = exact_L2_norm(i+1, boundary_initialiser);
+    std::cout << "number of cycles at level " << i+1 << " = " << cycles << std::endl;
+    std::cout << "L2 norm of error at level " << i+1 << " = " << error << std::endl << std::endl;
+//#endif
+  }
+
+}
+
+
+double Grid::L2_norm(int level)
+{
+  double *residual = calc_residual(level);
+  int size = (1 << level);
+  double L2norm = 0.0;
+  #pragma omp parallel for reduction(+:L2norm)
+  for(int y = 1; y < size; ++y)
+  {
+    for(int x = 1; x < size; ++x)
+    {
+      L2norm += residual[x + y*(size+1)] * residual[x + y*(size+1)];
+    }
+  }
+  delete[] residual;
+  return sqrt(L2norm);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
