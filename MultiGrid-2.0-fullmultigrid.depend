@@ -24,14 +24,14 @@
 	"grid.h"
 	"initialisers.h"
 
-1373557444 source:c:\users\khoanguyen\documents\github\multigrid-2.0\grid.c
+1373559048 source:c:\users\khoanguyen\documents\github\multigrid-2.0\grid.c
 	"grid.h"
 	<iostream>
 	<fstream>
 	<cmath>
 	<omp.h>
 
-1373557410 c:\users\khoanguyen\documents\github\multigrid-2.0\grid.h
+1373559083 c:\users\khoanguyen\documents\github\multigrid-2.0\grid.h
 	<iostream>
 
 1373539427 source:c:\users\khoanguyen\documents\github\multigrid-2.0\initialisers.c
@@ -40,7 +40,7 @@
 
 1373539427 c:\users\khoanguyen\documents\github\multigrid-2.0\initialisers.h
 
-1373544109 source:c:\users\khoanguyen\documents\github\multigrid-2.0\main.c
+1373558531 source:c:\users\khoanguyen\documents\github\multigrid-2.0\main.c
 	<stdlib.h>
 	<sys/time.h>
 	<ctime>

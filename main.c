@@ -14,7 +14,7 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-  unsigned int L = 10;
+  int L = 10;
   unsigned num_threads = 1;
   stringstream ss("");
   if (argc>3){
@@ -53,33 +53,23 @@ int main(int argc, char* argv[])
   Grid A(L,num_threads);
   A.initialise_u_boundary(sinh_function);
 
-  //unsigned int vcount[] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1};
-  A.fmg_solve(1,5,5,sinh_function);
+  //int vcount[] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+  A.fmg_solve(2,5,5,sinh_function);
 
   //end time measurement
   gettimeofday(&end, NULL);
 
   //output result to file in format compatiable with gnuplot
-//  std::ofstream outputfile;
-//  outputfile.open("solution.dat");
-//  outputfile << A;
-//  outputfile.close();
+  std::ofstream outputfile;
+  outputfile.open("solution.dat");
+  outputfile << A;
+  outputfile.close();
 
   //calculate and output operating time
   operation_time = (end.tv_sec - start.tv_sec)*1000000 + end.tv_usec - start.tv_usec;
   std::cout << "Operating time (us): " << operation_time << std::endl;
   std::cout << "start time " << start.tv_sec << ":" << start.tv_usec << std::endl;
   std::cout << "end time " << end.tv_sec << ":" << end.tv_usec << std::endl;
-//
-//   #ifndef DEBUG
-//   //log operating time
-//   time_t now = time(0);
-//   tm *ltm = localtime(&now);
-//   std::ofstream logfile;
-//   logfile.open("performance_log.txt",  std::ofstream::out | std::ofstream::app);
-//   logfile << ltm->tm_mday << "/" << 1 + ltm->tm_mon << "/" << 1900 + ltm->tm_year << " " << 1 + ltm->tm_hour << ":" << 1 + ltm->tm_min << ":" << 1 + ltm->tm_sec << " - " << operation_time << " us" << std::endl;
-//   logfile.close();
-//   #endif
 
   return 0;
 }
